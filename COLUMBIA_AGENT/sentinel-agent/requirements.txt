@@ -1,0 +1,37 @@
+# ─── Core Framework ─────────────────────────
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+python-dotenv==1.0.1
+pydantic==2.10.4
+pydantic-settings==2.7.1
+
+# ─── WebSocket & Async ──────────────────────
+websockets==14.1
+aiohttp==3.11.11
+aiofiles==24.1.0
+
+# ─── ML & Data Science ─────────────────────
+numpy==2.2.1
+scipy==1.15.0
+scikit-learn==1.6.1
+pandas==2.2.3
+
+# ─── Audio Processing ──────────────────────
+webrtcvad==2.0.10
+
+# ─── AI / LLM Integration ─────────────────
+anthropic==0.44.0
+openai==1.59.6
+google-genai>=1.66.0
+google-auth>=2.0.0
+
+# ─── Image Processing ─────────────────────
+Pillow==11.1.0
+
+# ─── Serialization ────────────────────────
+orjson==3.10.14
+
+# ─── Logging ──────────────────────────────
+structlog==24.4.0
+rich==13.9.4

@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SENTINEL — Real-Time Financial Analyst</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0a1628;
+    color: #c0d8f0;
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ── Header ── */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 20px;
+    border-bottom: 1px solid #122a45;
+    background: rgba(10, 22, 40, 0.97);
+    height: 50px;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon {
+    width: 28px; height: 28px; border-radius: 6px;
+    background: linear-gradient(135deg, #00ffc8, #0088ff);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 900; color: #0a1628;
+  }
+  .logo-text { font-size: 13px; font-weight: 700; letter-spacing: 2px; color: #00ffc8; }
+  .status-bar { display: flex; align-items: center; gap: 14px; font-size: 10px; }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; animation: pulse 2s infinite; }
+  .status-dot.connected { background: #00ffc8; }
+  .status-dot.disconnected { background: #ff3860; }
+  .agent-status {
+    padding: 3px 10px; border-radius: 12px; font-weight: 600; font-size: 9px;
+    letter-spacing: 1px; text-transform: uppercase;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* ── Ticker Tape ── */
+  .ticker-tape {
+    display: flex; gap: 0; overflow: hidden;
+    border-bottom: 1px solid #122a45;
+    background: #0b1a30; height: 32px; align-items: center;
+    padding: 0 8px;
+  }
+  .ticker-tape-inner {
+    display: flex; gap: 24px; animation: scroll-tape 40s linear infinite;
+    white-space: nowrap;
+  }
+  .tape-item { display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 600; }
+  .tape-sym { color: #8ea8c8; }
+  .tape-price { color: #c0d8f0; }
+  .tape-chg { font-size: 9px; }
+  .tape-chg.up { color: #00ffc8; }
+  .tape-chg.down { color: #ff3860; }
+  @keyframes scroll-tape { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
+
+  /* ── Main Layout ── */
+  .main { display: grid; grid-template-columns: 1fr 380px; height: calc(100vh - 82px); }
+
+  /* ── Chat Panel ── */
+  .chat-panel { display: flex; flex-direction: column; border-right: 1px solid #122a45; }
+  .messages {
+    flex: 1;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;       /* enable vertical scrolling */
+    overscroll-behavior: contain;
+  }
+  .message {
+    max-width: 82%; padding: 10px 14px; border-radius: 10px;
+    font-size: 12px; line-height: 1.6; animation: fadeIn 0.25s;
+    word-wrap: break-word;
+  }
+  .message.user {
+    align-self: flex-end;
+    background: rgba(0,136,255,0.12); border: 1px solid rgba(0,136,255,0.2);
+  }
+  .message.agent {
+    align-self: flex-start;
+    background: rgba(0,255,200,0.06); border: 1px solid rgba(0,255,200,0.12);
+  }
+  .message.system {
+    align-self: center; text-align: center;
+    font-size: 10px; color: #5a7a9a; padding: 4px 14px;
+    background: rgba(90,122,154,0.08); border-radius: 20px;
+  }
+  .message.alert {
+    align-self: stretch;
+    background: rgba(255,56,96,0.08); border: 1px solid rgba(255,56,96,0.25);
+    border-left: 3px solid #ff3860;
+  }
+  .message .label {
+    font-size: 8px; font-weight: 700; letter-spacing: 1.5px;
+    margin-bottom: 3px; text-transform: uppercase;
+  }
+  .message.user .label { color: #0088ff; }
+  .message.agent .label { color: #00ffc8; }
+  .message.alert .label { color: #ff3860; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+
+  .thinking {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; color: #5a7a9a; padding: 6px 16px;
+  }
+  .thinking-dots span {
+    display: inline-block; width: 5px; height: 5px; border-radius: 50%;
+    background: #00ffc8; animation: blink 1.4s infinite;
+  }
+  .thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink { 0%,100%{opacity:0.2} 50%{opacity:1} }
+
+  /* ── Input Bar ── */
+  .input-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid #122a45; background: #0c1a2e;
+  }
+  .input-bar input {
+    flex: 1; padding: 9px 14px; border-radius: 8px;
+    background: #0a1628; border: 1px solid #1a2332;
+    color: #c0d8f0; font-family: inherit; font-size: 12px;
+    outline: none; transition: border-color 0.2s;
+  }
+  .input-bar input:focus { border-color: #00ffc8; }
+  .btn {
+    padding: 9px 14px; border-radius: 8px; border: none;
+    font-family: inherit; font-size: 11px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s; letter-spacing: 0.5px;
+  }
+  .btn-primary { background: #00ffc8; color: #0a1628; }
+  .btn-primary:hover { background: #00e6b5; }
+  .btn-mic {
+    background: #1a2332; color: #c0d8f0; font-size: 16px;
+    width: 40px; height: 40px; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%; border: 2px solid #1a2332; transition: all 0.2s;
+    user-select: none;
+  }
+  .btn-mic:hover { border-color: #0088ff; }
+  .btn-mic.recording {
+    background: #ff3860; color: white; border-color: #ff3860;
+    animation: pulse 0.8s infinite;
+  }
+  .btn-upload { background: #1a2332; color: #c0d8f0; font-size: 14px; width: 40px; padding: 9px; }
+
+  /* ── Side Panel ── */
+  .side-panel {
+    display: flex; flex-direction: column;
+    background: #0c1a2e; overflow-y: auto;
+  }
+  .panel-section { padding: 12px 14px; border-bottom: 1px solid #122a45; }
+  .panel-title {
+    font-size: 9px; font-weight: 700; letter-spacing: 2px;
+    color: #5a7a9a; margin-bottom: 8px; text-transform: uppercase;
+  }
+
+  /* ── Watchlist ── */
+  .watchlist { display: flex; flex-direction: column; gap: 2px; }
+  .wl-row {
+    display: grid; grid-template-columns: 60px 1fr 70px 60px;
+    align-items: center; padding: 6px 8px; border-radius: 6px;
+    font-size: 10px; transition: background 0.15s; cursor: default;
+  }
+  .wl-row:hover { background: rgba(0,136,255,0.06); }
+  .wl-row.selected { background: rgba(0,255,200,0.08); border-left: 2px solid #00ffc8; }
+  .wl-sym { font-weight: 700; color: #e0ecf8; font-size: 11px; }
+  .wl-name { color: #5a7a9a; font-size: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wl-price { text-align: right; font-weight: 600; color: #c0d8f0; }
+  .wl-chg { text-align: right; font-weight: 600; font-size: 9px; }
+  .wl-chg.up { color: #00ffc8; }
+  .wl-chg.down { color: #ff3860; }
+
+  .wl-header {
+    display: grid; grid-template-columns: 60px 1fr 70px 60px;
+    padding: 2px 8px 6px; font-size: 8px; color: #3a5a7a;
+    text-transform: uppercase; letter-spacing: 1px; font-weight: 600;
+    border-bottom: 1px solid #0f2238;
+  }
+
+  /* ── Primary Ticker Detail ── */
+  .primary-detail { display: flex; align-items: baseline; gap: 10px; }
+  .primary-price { font-size: 24px; font-weight: 700; color: #00ffc8; }
+  .primary-change { font-size: 11px; font-weight: 600; }
+  .primary-change.up { color: #00ffc8; }
+  .primary-change.down { color: #ff3860; }
+  .primary-sym { font-size: 11px; font-weight: 700; color: #8ea8c8; margin-bottom: 4px; }
+
+  .metric-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 4px 0; font-size: 10px;
+  }
+  .metric-label { color: #5a7a9a; }
+  .metric-value { color: #c0d8f0; font-weight: 600; }
+
+  /* ── Anomaly ── */
+  .score-bar { height: 4px; border-radius: 2px; background: #1a2332; margin-top: 6px; overflow: hidden; }
+  .score-fill { height: 100%; border-radius: 2px; transition: width 0.5s; }
+
+  /* ── Alerts ── */
+  .alert-item {
+    padding: 8px; border-radius: 5px; margin-bottom: 4px;
+    background: rgba(255,56,96,0.05); border-left: 3px solid #ff3860;
+    font-size: 10px; cursor: default;
+  }
+  .alert-item:hover { background: rgba(255,56,96,0.1); }
+  .alert-item .severity {
+    font-size: 8px; font-weight: 700; letter-spacing: 1px;
+    padding: 1px 5px; border-radius: 3px; display: inline-block; margin-bottom: 3px;
+  }
+  .severity-CRITICAL { background: rgba(255,56,96,0.2); color: #ff3860; }
+  .severity-HIGH { background: rgba(255,140,0,0.2); color: #ff8c00; }
+  .severity-MEDIUM { background: rgba(255,170,0,0.2); color: #ffaa00; }
+
+  #imageUpload { display: none; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">◈</div>
+    <div class="logo-text">SENTINEL</div>
+  </div>
+  <div class="status-bar">
+    <span id="agentStatus" class="agent-status" style="background:rgba(90,122,154,0.2);color:#5a7a9a">IDLE</span>
+    <div style="display:flex;align-items:center;gap:5px;">
+      <div id="connDot" class="status-dot disconnected"></div>
+      <span id="connLabel" style="color:#5a7a9a;font-size:9px">DISCONNECTED</span>
+    </div>
+  </div>
+</div>
+
+<!-- Scrolling Ticker Tape -->
+<div class="ticker-tape">
+  <div class="ticker-tape-inner" id="tickerTape"></div>
+</div>
+
+<!-- Main -->
+<div class="main">
+  <!-- Chat Panel -->
+  <div class="chat-panel">
+    <div class="messages" id="messages"></div>
+    <div id="thinkingIndicator" class="thinking" style="display:none">
+      <div class="thinking-dots"><span></span><span></span><span></span></div>
+      <span>SENTINEL is analyzing...</span>
+    </div>
+    <div class="input-bar">
+      <button class="btn btn-mic" id="micBtn" title="Click & hold to speak">🎤</button>
+      <input type="text" id="textInput" placeholder="Ask SENTINEL about any ticker…" />
+      <button class="btn btn-upload" id="uploadBtn" title="Upload chart image">📊</button>
+      <input type="file" id="imageUpload" accept="image/*" />
+      <button class="btn btn-primary" id="sendBtn">SEND</button>
+    </div>
+  </div>
+
+  <!-- Side Panel -->
+  <div class="side-panel">
+    <!-- Primary Ticker -->
+    <div class="panel-section">
+      <div class="primary-sym" id="primarySym">SPY — SPDR S&P 500 ETF</div>
+      <div class="primary-detail">
+        <span class="primary-price" id="primaryPrice">$—</span>
+        <span class="primary-change" id="primaryChange">—</span>
+      </div>
+      <div style="margin-top:8px">
+        <div class="metric-row"><span class="metric-label">Volume</span><span class="metric-value" id="primaryVol">—</span></div>
+        <div class="metric-row"><span class="metric-label">Volatility</span><span class="metric-value" id="primaryVolat">—</span></div>
+        <div class="metric-row"><span class="metric-label">Ticks</span><span class="metric-value" id="tickCount">0</span></div>
+      </div>
+    </div>
+
+    <!-- Watchlist -->
+    <div class="panel-section" style="padding-bottom:6px">
+      <div class="panel-title">Watchlist</div>
+      <div class="wl-header">
+        <span>Symbol</span><span>Name</span><span style="text-align:right">Price</span><span style="text-align:right">Chg%</span>
+      </div>
+      <div class="watchlist" id="watchlist"></div>
+    </div>
+
+    <!-- Anomaly Score -->
+    <div class="panel-section">
+      <div class="panel-title">Anomaly Score (SPY)</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span id="anomalyScore" style="font-size:20px;font-weight:700;color:#00ffc8">0.00</span>
+        <span id="anomalyLabel" style="font-size:9px;font-weight:600;color:#5a7a9a">NORMAL</span>
+      </div>
+      <div class="score-bar">
+        <div class="score-fill" id="scoreFill" style="width:0%;background:#00ffc8"></div>
+      </div>
+    </div>
+
+    <!-- Recent Alerts -->
+    <div class="panel-section" style="flex:1;overflow-y:auto">
+      <div class="panel-title">Recent Alerts</div>
+      <div id="alertsList"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────
+const CLIENT_ID = 'client-' + Math.random().toString(36).substr(2, 8);
+let ws = null;
+let isRecording = false;
+let audioContext = null;
+let audioStream = null;
+const alerts = [];
+let tickerData = {};   // symbol → latest tick
+let selectedSymbol = 'SPY';
+
+// ─── WebSocket ───────────────────────────────────────
+function connect() {
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(`${protocol}//${location.host}/ws/agent/${CLIENT_ID}`);
+  ws.binaryType = 'arraybuffer';
+
+  ws.onopen = () => {
+    document.getElementById('connDot').className = 'status-dot connected';
+    document.getElementById('connLabel').textContent = 'CONNECTED';
+    addMessage('system', 'Connected to SENTINEL. Ask about any ticker — AAPL, TSLA, SPY, ES, NVDA…');
+  };
+  ws.onclose = () => {
+    document.getElementById('connDot').className = 'status-dot disconnected';
+    document.getElementById('connLabel').textContent = 'DISCONNECTED';
+    setTimeout(connect, 3000);
+  };
+  ws.onerror = () => {};
+  ws.onmessage = (evt) => {
+    try { handleMessage(JSON.parse(evt.data)); } catch(e) { console.warn('WS parse error', e); }
+  };
+}
+
+// ─── Message Handler ─────────────────────────────────
+function handleMessage(msg) {
+  const { event, data } = msg;
+  switch (event) {
+    case 'connected': break;
+    case 'agent_status': updateAgentStatus(data.status); break;
+    case 'transcription':
+      if (data.is_final && data.source === 'voice') addMessage('user', data.text);
+      break;
+    case 'agent_thinking':
+      document.getElementById('thinkingIndicator').style.display = 'flex';
+      break;
+    case 'agent_token':
+      document.getElementById('thinkingIndicator').style.display = 'none';
+      appendToLastAgent(data.token);
+      break;
+    case 'agent_response_complete':
+      finalizeAgentMessage(); break;
+    case 'agent_error':
+      document.getElementById('thinkingIndicator').style.display = 'none';
+      addMessage('alert', '⚠️ ' + (data.error || 'Unknown error'));
+      currentAgentMsg = null;
+      break;
+    case 'agent_audio': playAudio(data.audio_base64, data.format); break;
+    case 'market_tick': updateMarketDisplay(data); break;
+    case 'anomaly_alert':
+      // Only update the side-panel alerts list; do NOT add chat messages
+      handleAlert(data);
+      break;
+    case 'vision_analysis': addMessage('agent', '📊 ' + data.analysis); break;
+    case 'proactive_alert':
+      // Only update the side-panel alerts list; do NOT add chat messages
+      handleAlert({ detection: { severity: data.severity }, explanation: data.explanation });
+      break;
+    case 'interrupt': addMessage('system', 'Interrupted — listening…'); break;
+  }
+}
+
+// Helper: smart scroll (auto-scroll when user is near bottom)
+function smartScrollToBottom(force = false) {
+  const c = document.getElementById('messages');
+  if (!c) return;
+  if (force) {
+    c.scrollTop = c.scrollHeight;
+    return;
+  }
+  const threshold = 200; // px from bottom to still auto-scroll
+  const distance = c.scrollHeight - c.scrollTop - c.clientHeight;
+  const atBottom = distance <= threshold;
+  if (atBottom) c.scrollTop = c.scrollHeight;
+}
+
+// ─── Chat UI ─────────────────────────────────────────
+let currentAgentMsg = null;
+
+function addMessage(type, text) {
+  const c = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'message ' + type;
+  const labels = { user:'YOU', agent:'SENTINEL', system:'', alert:'ALERT' };
+  const lbl = labels[type] || '';
+  div.innerHTML = lbl
+    ? '<div class="label">' + lbl + '</div><span class="msg-text">' + text + '</span>'
+    : text;
+  c.appendChild(div);
+
+  // Always scroll when it's a user or system/alert message
+  if (type === 'user' || type === 'system' || type === 'alert') {
+    smartScrollToBottom(true);
+  } else {
+    smartScrollToBottom(false);
+  }
+
+  if (type === 'agent') currentAgentMsg = div;
+  return div;
+}
+
+function appendToLastAgent(token) {
+  const c = document.getElementById('messages');
+  if (!c) return;
+
+  if (!currentAgentMsg || !currentAgentMsg.classList.contains('agent')) {
+    currentAgentMsg = addMessage('agent', '');
+  }
+  let span = currentAgentMsg.querySelector('.msg-text');
+  if (!span) {
+    span = document.createElement('span');
+    span.className = 'msg-text';
+    currentAgentMsg.appendChild(span);
+  }
+  span.textContent += token;
+
+  // Auto-scroll whenever user is near the bottom
+  smartScrollToBottom(false);
+}
+
+function finalizeAgentMessage() {
+  currentAgentMsg = null;
+  document.getElementById('thinkingIndicator').style.display = 'none';
+}
+
+function updateAgentStatus(status) {
+  const el = document.getElementById('agentStatus');
+  const c = { IDLE:{bg:'rgba(90,122,154,0.2)',c:'#5a7a9a'}, LISTENING:{bg:'rgba(0,136,255,0.2)',c:'#0088ff'},
+              THINKING:{bg:'rgba(255,170,0,0.2)',c:'#ffaa00'}, SPEAKING:{bg:'rgba(0,255,200,0.2)',c:'#00ffc8'} };
+  const s = c[status] || c.IDLE;
+  el.style.background = s.bg; el.style.color = s.c; el.textContent = status;
+}
+
+// ─── Market Display ──────────────────────────────────
+function updateMarketDisplay(combined) {
+  const tickers = combined.tickers || [];
+  const primary = combined.primary || {};
+  const tickNum = combined.tick_number || 0;
+
+  // Update per-ticker state
+  tickers.forEach(t => { tickerData[t.symbol] = t; });
+
+  // Primary detail
+  if (primary.symbol) {
+    document.getElementById('primarySym').textContent = primary.symbol + ' — ' + (primary.name || '');
+    document.getElementById('primaryPrice').textContent = '$' + primary.price.toFixed(2);
+    const chgEl = document.getElementById('primaryChange');
+    const chg = primary.change || 0;
+    const pct = primary.change_pct || 0;
+    chgEl.textContent = (chg >= 0 ? '+' : '') + chg.toFixed(2) + ' (' + pct.toFixed(2) + '%)';
+    chgEl.className = 'primary-change ' + (chg >= 0 ? 'up' : 'down');
+    document.getElementById('primaryVol').textContent = primary.volume > 0 ? (primary.volume / 1e6).toFixed(2) + 'M' : '—';
+    document.getElementById('primaryVolat').textContent = primary.volatility + '%';
+    document.getElementById('tickCount').textContent = tickNum;
+
+    // Anomaly score
+    const score = primary.anomaly_score || 0;
+    document.getElementById('anomalyScore').textContent = score.toFixed(3);
+    const fill = document.getElementById('scoreFill');
+    fill.style.width = (score * 100) + '%';
+    const scoreEl = document.getElementById('anomalyScore');
+    if (score > 0.7) { scoreEl.style.color='#ff3860'; fill.style.background='#ff3860'; document.getElementById('anomalyLabel').textContent='CRITICAL'; }
+    else if (score > 0.45) { scoreEl.style.color='#ffaa00'; fill.style.background='#ffaa00'; document.getElementById('anomalyLabel').textContent='ELEVATED'; }
+    else { scoreEl.style.color='#00ffc8'; fill.style.background='#00ffc8'; document.getElementById('anomalyLabel').textContent='NORMAL'; }
+  }
+
+  // Watchlist
+  renderWatchlist(tickers);
+
+  // Ticker tape
+  renderTickerTape(tickers);
+}
+
+function renderWatchlist(tickers) {
+  const wl = document.getElementById('watchlist');
+  wl.innerHTML = tickers.map(t => {
+    const chg = t.change_pct || 0;
+    const cls = chg >= 0 ? 'up' : 'down';
+    const sel = t.symbol === selectedSymbol ? ' selected' : '';
+    return '<div class="wl-row' + sel + '" data-sym="' + t.symbol + '">' +
+      '<span class="wl-sym">' + t.symbol + '</span>' +
+      '<span class="wl-name">' + (t.name || '') + '</span>' +
+      '<span class="wl-price">$' + t.price.toFixed(2) + '</span>' +
+      '<span class="wl-chg ' + cls + '">' + (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%</span>' +
+    '</div>';
+  }).join('');
+
+  // Click to select
+  wl.querySelectorAll('.wl-row').forEach(row => {
+    row.addEventListener('click', () => {
+      selectedSymbol = row.dataset.sym;
+      const t = tickerData[selectedSymbol];
+      if (t) {
+        document.getElementById('primarySym').textContent = t.symbol + ' — ' + (t.name || '');
+        document.getElementById('primaryPrice').textContent = '$' + t.price.toFixed(2);
+        const chgEl = document.getElementById('primaryChange');
+        const chg = t.change || 0; const pct = t.change_pct || 0;
+        chgEl.textContent = (chg >= 0 ? '+' : '') + chg.toFixed(2) + ' (' + pct.toFixed(2) + '%)';
+        chgEl.className = 'primary-change ' + (chg >= 0 ? 'up' : 'down');
+      }
+    });
+  });
+}
+
+function renderTickerTape(tickers) {
+  const tape = document.getElementById('tickerTape');
+  // Duplicate for seamless scroll
+  const items = tickers.map(t => {
+    const chg = t.change_pct || 0;
+    const cls = chg >= 0 ? 'up' : 'down';
+    return '<span class="tape-item"><span class="tape-sym">' + t.symbol + '</span>' +
+      '<span class="tape-price">$' + t.price.toFixed(2) + '</span>' +
+      '<span class="tape-chg ' + cls + '">' + (chg >= 0 ? '▲' : '▼') + Math.abs(chg).toFixed(2) + '%</span></span>';
+  }).join('');
+  tape.innerHTML = items + items; // duplicate for seamless loop
+}
+
+function handleAlert(data) {
+  const { detection, explanation } = data;
+  const sev = (detection && detection.severity) || 'MEDIUM';
+  alerts.unshift({ severity: sev, explanation: explanation || '', time: new Date().toLocaleTimeString() });
+  if (alerts.length > 20) alerts.pop();
+  const list = document.getElementById('alertsList');
+  list.innerHTML = alerts.map(a =>
+    '<div class="alert-item"><span class="severity severity-' + a.severity + '">' + a.severity + '</span>' +
+    '<span style="color:#5a7a9a;font-size:9px;margin-left:6px">' + a.time + '</span>' +
+    '<div style="margin-top:3px;color:#8ea8c8;line-height:1.3">' + a.explanation.slice(0, 140) + '…</div></div>'
+  ).join('');
+}
+
+// ─── Audio ───────────────────────────────────────────
+function playAudio(b64, fmt) {
+  try { new Audio('data:audio/' + fmt + ';base64,' + b64).play(); } catch(e) {}
+}
+
+// ─── Microphone (push-to-talk) ───────────────────────
+async function startRecording() {
+  try {
+    audioStream = await navigator.mediaDevices.getUserMedia({
+      audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true }
+    });
+    audioContext = new AudioContext({ sampleRate: 16000 });
+    const source = audioContext.createMediaStreamSource(audioStream);
+    const processor = audioContext.createScriptProcessor(4096, 1, 1);
+    processor.onaudioprocess = (e) => {
+      if (!isRecording || !ws || ws.readyState !== 1) return;
+      const pcm = e.inputBuffer.getChannelData(0);
+      const buf = new Int16Array(pcm.length);
+      for (let i = 0; i < pcm.length; i++) buf[i] = Math.max(-32768, Math.min(32767, pcm[i] * 32768));
+      ws.send(buf.buffer);
+    };
+    source.connect(processor);
+    processor.connect(audioContext.destination);
+    isRecording = true;
+    updateAgentStatus('LISTENING');
+  } catch (e) {
+    console.error('Mic error:', e);
+    addMessage('system', '🎤 Microphone access denied. Please allow mic access or use text input.');
+  }
+}
+
+function stopRecording() {
+  isRecording = false;
+  if (audioStream) { audioStream.getTracks().forEach(t => t.stop()); audioStream = null; }
+  if (audioContext) { audioContext.close().catch(()=>{}); audioContext = null; }
+  updateAgentStatus('IDLE');
+}
+
+// ─── Event Listeners ─────────────────────────────────
+document.getElementById('sendBtn').addEventListener('click', () => {
+  const input = document.getElementById('textInput');
+  const text = input.value.trim();
+  if (text && ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ event: 'text', data: { message: text } }));
+    addMessage('user', text);
+    input.value = '';
+    smartScrollToBottom(true);
+  }
+});
+
+document.getElementById('textInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('sendBtn').click();
+});
+
+// Mic: mousedown/mouseup + touchstart/touchend
+const micBtn = document.getElementById('micBtn');
+function micStart(e) { e.preventDefault(); micBtn.classList.add('recording'); startRecording(); }
+function micStop(e) { e.preventDefault(); micBtn.classList.remove('recording'); stopRecording(); }
+micBtn.addEventListener('mousedown', micStart);
+micBtn.addEventListener('mouseup', micStop);
+micBtn.addEventListener('mouseleave', (e) => { if (isRecording) micStop(e); });
+micBtn.addEventListener('touchstart', micStart, { passive: false });
+micBtn.addEventListener('touchend', micStop, { passive: false });
+
+document.getElementById('uploadBtn').addEventListener('click', () => document.getElementById('imageUpload').click());
+document.getElementById('imageUpload').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const b64 = reader.result.split(',')[1];
+    if (ws && ws.readyState === 1) {
+      ws.send(JSON.stringify({ event:'image', data:{ image:b64, query:'Analyze this chart for anomalies and patterns.' } }));
+      addMessage('user', '📊 Uploaded: ' + file.name);
+    }
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+});
+
+// ─── Boot ────────────────────────────────────────────
+connect();
+</script>
+</body>
+</html>
