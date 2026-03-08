@@ -1,6 +1,8 @@
 # OS
 .DS_Store
 Thumbs.db
+__MACOSX/
+._*
 
 # Editors
 .vscode/
